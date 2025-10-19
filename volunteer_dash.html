@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FeedForward | Volunteer Dashboard</title>
+<style>
+body { font-family:"Poppins",sans-serif; background:#f1fefb; color:#333; margin:0; }
+.container { max-width:1100px; margin:40px auto; background:#fff; border-radius:15px; padding:25px; box-shadow:0 2px 20px rgba(32,191,169,0.15); }
+h1 { color:#20bfa9; text-align:center; }
+input, select { padding:8px; border:1px solid #cce7e2; border-radius:8px; width:200px; margin-right:8px; }
+button { background:#20bfa9; border:none; color:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; }
+button:hover { background:#1aa58e; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th, td { border-bottom:1px solid #e0f5f2; padding:10px; text-align:left; }
+th { color:#20bfa9; border-bottom:2px solid #c6eee8; }
+.status-delivered { color:#20bfa9; font-weight:600; }
+.back-btn { display:block; margin:20px auto; background:#20bfa9; color:#fff; padding:10px 25px; border:none; border-radius:8px; font-weight:600; text-decoration:none; text-align:center; }
+.back-btn:hover { background:#1aa58e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Volunteer Dashboard</h1>
+
+  <div style="margin-bottom:20px;text-align:center;">
+    <input id="volName" type="text" placeholder="Volunteer Name">
+    <input id="volLocation" type="text" placeholder="Location">
+    <button onclick="saveVol()">Save Details</button>
+  </div>
+
+  <table id="volTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Donation</th>
+        <th>Delivery Type</th>
+        <th>Status</th>
+        <th>Verified</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <a href="login.html" class="back-btn">⬅ Back to Login</a>
+</div>
+
+<script>
+let volName = localStorage.getItem('volName') || '';
+let volLocation = localStorage.getItem('volLocation') || '';
+document.getElementById('volName').value = volName;
+document.getElementById('volLocation').value = volLocation;
+
+function saveVol(){
+  volName = document.getElementById('volName').value.trim();
+  volLocation = document.getElementById('volLocation').value.trim();
+  if(!volName){ alert('Enter your name first!'); return; }
+  localStorage.setItem('volName', volName);
+  localStorage.setItem('volLocation', volLocation);
+  alert('✅ Volunteer details saved.');
+}
+
+async function loadData(){
+  const res = await fetch('volunteer.php');
+  const data = await res.json();
+  const tbody = document.querySelector('#volTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(d=>{
+    const verified = d.delivery_verified==1 ? 'Yes' : 'No';
+    const status = d.status || 'Pending';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.distribution_id}</td>
+      <td>${d.donation_id}</td>
+      <td>${d.delivery_type || '-'}</td>
+      <td class="status">${status}</td>
+      <td>${verified}</td>
+      <td>${actionBtn(d)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function actionBtn(d){
+  const st = (d.status||'').toLowerCase();
+  if(st === 'distributed' && d.delivery_verified==0)
+    return `
+      <select id="type-${d.distribution_id}">
+        <option value="">Select Type</option>
+        <option value="Foot">Foot</option>
+        <option value="Bike">Bike</option>
+        <option value="Car">Car</option>
+      </select>
+      <button onclick="setType(${d.distribution_id})">Set</button>`;
+  if(st === 'in transit' && d.delivery_verified==0)
+    return `<button onclick="markDelivered(${d.distribution_id})">Delivered</button>`;
+  if(d.delivery_verified==1)
+    return `<span class="status-delivered">Delivered ✅</span>`;
+  return '';
+}
+
+function setType(id){
+  const type = document.getElementById(`type-${id}`).value;
+  if(!type){ alert('Select delivery type first!'); return; }
+  fetch('volunteer.php',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:`distribution_id=${id}&action=set_type&delivery_type=${encodeURIComponent(type)}`
+  })
+  .then(r=>r.json())
+  .then(()=>{
+    // Change status to "In Transit"
+    fetch('volunteer.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`distribution_id=${id}&action=in_transit`
+    });
+    alert('🚴 Delivery type set. You can now mark as delivered.');
+    loadData();
+  });
+}
+
+function markDelivered(id){
+  fetch('volunteer.php',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:`distribution_id=${id}&action=delivered`
+  }).then(r=>r.json()).then(()=>{
+    alert('✅ Delivery confirmed!');
+    loadData();
+  });
+}
+
+loadData();
+</script>
+
+</body>
+</html>
