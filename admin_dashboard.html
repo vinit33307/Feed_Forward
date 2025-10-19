@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>FeedForward | Admin Dashboard</title>
+<style>
+body {
+  font-family: "Poppins", sans-serif;
+  background: #f1fefb;
+  margin: 0;
+  color: #333;
+}
+.container {
+  max-width: 1200px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 15px; 
+  padding: 25px;
+  box-shadow: 0 2px 20px rgba(32,191,169,0.15);
+}
+h1 { text-align: center; color: #20bfa9; margin-bottom: 10px; }
+h2 { color: #20bfa9; border-bottom: 2px solid #c6eee8; padding-bottom: 5px; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0 30px;
+}
+th, td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #eaf8f4;
+}
+th { color: #20bfa9; }
+button {
+  background: #20bfa9;
+  border: none;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+button:hover { background: #1aa58e; }
+span.accepted { color:#20bfa9; font-weight:600; }
+.back-btn {
+  display:block; margin:25px auto 0; text-align:center;
+  text-decoration:none; background:#20bfa9; color:#fff;
+  padding:10px 25px; border-radius:8px; font-weight:600;
+}
+.back-btn:hover { background:#1aa58e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Admin Dashboard</h1>
+
+  <!-- Donor Table -->
+  <h2>Donations</h2>
+  <table id="donorTable">
+    <thead>
+      <tr><th>ID</th><th>Donor Name</th><th>Food</th><th>Quantity</th><th>Status</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- NGO Table -->
+  <h2>NGOs</h2>
+  <table id="ngoTable">
+    <thead>
+      <tr><th>ID</th><th>NGO Name</th><th>Location</th><th>Status</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Volunteer Table -->
+  <h2>Volunteers</h2>
+  <table id="volTable">
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Location / Contact</th><th>Status</th><th>Deliveries</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <a href="login.html" class="back-btn">⬅ Back to Login</a>
+</div>
+
+<script>
+async function loadAdmin() {
+  try {
+    const res = await fetch('admin.php');
+    const data = await res.json();
+
+    // --- Donor table ---
+    const donorBody = document.querySelector('#donorTable tbody');
+    donorBody.innerHTML = '';
+    (data.donations || []).forEach(d => {
+      const tr = document.createElement('tr');
+      const status = d.status || d.donation_status || 'Pending';
+      tr.innerHTML = `
+        <td>${d.donation_id||''}</td>
+        <td>${d.donor_name||''}</td>
+        <td>${d.food_type||d.food_item||''}</td>
+        <td>${d.quantity||''}</td>
+        <td>${status}</td>
+        <td>
+          ${status.toLowerCase()==='pending' || !status ? `<button onclick="acceptDonation(${d.donation_id})">Accept</button>` :
+            `<span class="accepted">${status}</span>`}
+        </td>`;
+      donorBody.appendChild(tr);
+    });
+
+    // --- NGO table ---
+    const ngoBody = document.querySelector('#ngoTable tbody');
+    ngoBody.innerHTML = '';
+    (data.admin_ngos || []).forEach(n => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${n.ngo_id || n.pickup_id || ''}</td>
+        <td>${n.ngo_name || n.ngo || ''}</td>
+        <td>${n.location || ''}</td>
+        <td>${n.status || ''}</td>`;
+      ngoBody.appendChild(tr);
+    });
+
+    // --- Volunteer table ---
+    const volBody = document.querySelector('#volTable tbody');
+    volBody.innerHTML = '';
+    (data.admin_volenteer || []).forEach(v => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${v.volunteer_id || v.id || ''}</td>
+        <td>${v.name || v.volunteer || ''}</td>
+        <td>${v.email || v.phone || v.location || ''}</td>
+        <td>${v.status || ''}</td>
+        <td>${v.deliveries_count || v.deliveries || '—'}</td>`;
+      volBody.appendChild(tr);
+    });
+
+  } catch (err) {
+    alert('Error loading admin data: ' + err);
+    console.error(err);
+  }
+}
+
+function acceptDonation(id) {
+  if (!confirm('Accept this donation and create pickup for NGOs?')) return;
+  fetch('update_status.php', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'donation_id=' + id
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    alert(d.message || (d.success ? 'Donation accepted.' : 'Already accepted.'));
+    loadAdmin();
+  })
+  .catch(err=>alert('Error: ' + err));
+}
+
+loadAdmin();
+// optional auto-refresh every 10s — uncomment if you want auto updates:
+// setInterval(loadAdmin, 10000);
+</script>
+</body>
+</html>
